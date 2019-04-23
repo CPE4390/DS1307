@@ -1,27 +1,17 @@
 #include <xc.h>
-#include <stdio.h>
 #include "LCD.h"
 #include "DS1307.h"
 
-#if defined __18F8722
-#pragma config OSC=HSPLL
-#pragma config WDT=OFF
-#pragma config LVP=OFF
-#pragma config XINST=OFF
-#elif defined __18F87J11
 #pragma config FOSC=HSPLL
 #pragma config WDTEN=OFF
 #pragma config XINST=OFF
-#else
-#error Invalid processor selection
-#endif
 
 void InitPins(void);
 void ConfigInterrupts(void);
 unsigned int ReadPot(void);
 int GetValue(const char *prompt, int min, int max);
 
-char lcd[17];
+char str[17];
 DateTime dt;
 volatile char state;
 
@@ -33,10 +23,8 @@ void main(void) {
     LCDClear();
     InitPins();
     InitDS1307();
-    sprintf(lcd, "DS1302 Demo");
-    LCDWriteLine(lcd, 0);
+    lprintf(0, "DS1307 Demo");
     ConfigInterrupts();
-    //WriteClockRegister(0, 0);
     while (1) {
         if (state == 1) {
             int hours, minutes, dow, date, month, year;
@@ -65,12 +53,10 @@ void main(void) {
             ReadClock(&dt);
             if (dt.seconds != lastSeconds) {
                 lastSeconds = dt.seconds;
-                FormatTime(dt, lcd);
-                LCDClearLine(0);
-                LCDWriteLine(lcd, 0);
-                FormatDate(dt, lcd, true);
-                LCDClearLine(1);
-                LCDWriteLine(lcd, 1);
+                FormatTime(dt, str);
+                lprintf(0, str);
+                FormatDate(dt, str, true);
+                lprintf(1, str);
             }
             __delay_ms(1);
         }
@@ -101,7 +87,7 @@ void ConfigInterrupts(void) {
     INTCONbits.GIE = 1; //Turn on interrupts
 }
 
-void interrupt HighIsr(void) {
+void __interrupt(high_priority) HighIsr(void) {
     //Check the source of the interrupt
     if (INTCONbits.INT0IF == 1) {
         //Set clock
@@ -123,16 +109,13 @@ int GetValue(const char *prompt, int min, int max) {
     long knob;
     while (PORTBbits.RB0 == 0);
     __delay_ms(10);
-    LCDClearLine(0);
-    LCDWriteLine(prompt, 0);
+    lprintf(0, prompt);
     while (PORTBbits.RB0 == 1) {
         knob = ReadPot();
         knob *= (max - min) + 1;
         knob /= 1024;
         knob += min;
-        sprintf(lcd, "%d", (int)knob);
-        LCDClearLine(1);
-        LCDWriteLine(lcd, 1);
+        lprintf(1, "%d", (int)knob);
         __delay_ms(100);
     }
     __delay_ms(10);
